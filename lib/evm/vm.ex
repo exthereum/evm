@@ -62,7 +62,7 @@ defmodule EVM.VM do
       {%{}, %EVM.MachineState{pc: 6, gas: 0, stack: [8]}, %EVM.SubState{}, %EVM.ExecEnv{machine_code: EVM.MachineCode.compile([:push1, 3, :push1, 5, :add])}, ""}
 
       iex> EVM.VM.exec(%{}, %EVM.MachineState{pc: 0, gas: 24, stack: []}, %EVM.SubState{}, %EVM.ExecEnv{machine_code: EVM.MachineCode.compile([:push1, 3, :push1, 5, :add, :push1, 0x00, :mstore, :push1, 0, :push1, 32, :return])})
-      {%{}, %EVM.MachineState{active_words: 1, memory: <<0x08::256>>, pc: 13, gas: 0, stack: []}, %EVM.SubState{}, %EVM.ExecEnv{machine_code: EVM.MachineCode.compile([:push1, 3, :push1, 5, :add, :push1, 0x00, :mstore, :push1, 0, :push1, 32, :return])}, <<0x08::256>>}
+      {%{},%EVM.MachineState{active_words: 1, memory: <<0x08::256>>, gas: 0, pc: 13, previously_active_words: 1, stack: []}, %EVM.SubState{logs: "", refund: 0, suicide_list: []}, %EVM.ExecEnv{account_interface: nil, address: nil, block_interface: nil, contract_interface: nil, data: nil, gas_price: nil, machine_code: <<96, 3, 96, 5, 1, 96, 0, 82, 96, 0, 96, 32, 243>>, originator: nil, sender: nil, stack_depth: nil, value_in_wei: nil}, <<0x08::256>>}
   """
   @spec exec(EVM.state, MachineState.t, SubState.t, ExecEnv.t) :: {EVM.state | nil, MachineState.t, SubState.t, ExecEnv.t, output}
   def exec(state, machine_state, sub_state, exec_env) do
@@ -71,16 +71,31 @@ defmodule EVM.VM do
 
   @spec do_exec(EVM.state, MachineState.t, SubState.t, ExecEnv.t, SubState.t) :: {EVM.state | nil, MachineState.t, SubState.t, ExecEnv.t, output}
   defp do_exec(state, machine_state, sub_state, exec_env, original_sub_state) do
+
+    # Debugger generally runs here.
+    {state, machine_state, sub_state, exec_env} = if EVM.Debugger.is_enabled? do
+      case EVM.Debugger.is_breakpoint?(state, machine_state, sub_state, exec_env) do
+        :continue -> {state, machine_state, sub_state, exec_env}
+        breakpoint ->
+          EVM.Debugger.break(breakpoint, state, machine_state, sub_state, exec_env)
+      end
+    else
+      {state, machine_state, sub_state, exec_env}
+    end
+
     case Functions.is_exception_halt?(state, machine_state, exec_env) do
       {:halt, _reason} ->
         # We're exception halting, undo it all.
         {nil, machine_state, original_sub_state, exec_env, <<>>} # Question: should we return the original sub-state?
       :continue ->
         {n_state, n_machine_state, n_sub_state, n_exec_env} = cycle(state, machine_state, sub_state, exec_env)
-
-        case Functions.is_normal_halting?(machine_state, exec_env) do
-          nil -> do_exec(n_state, n_machine_state, n_sub_state, n_exec_env, original_sub_state) # continue execution
-          output -> {n_state, n_machine_state, n_sub_state, n_exec_env, output} # break execution and return
+        if machine_state.gas < 0 do
+          {nil, machine_state, original_sub_state, exec_env, <<>>}
+        else
+          case Functions.is_normal_halting?(machine_state, exec_env) do
+            nil -> do_exec(n_state, n_machine_state, n_sub_state, n_exec_env, original_sub_state) # continue execution
+            output -> {n_state, n_machine_state, n_sub_state, n_exec_env, output} # break execution and return
+          end
         end
     end
   end
@@ -97,17 +112,17 @@ defmodule EVM.VM do
   """
   @spec cycle(EVM.state, MachineState.t, SubState.t, ExecEnv.t) :: {EVM.state, MachineState.t, SubState.t, ExecEnv.t}
   def cycle(state, machine_state, sub_state, exec_env) do
-    cost = Gas.cost(state, machine_state, exec_env)
-
     operation = MachineCode.current_instruction(machine_state, exec_env) |> Operation.decode
+    {updated_state, updated_machine_state, sub_state, exec_env} = Operation.run_operation(operation, state, machine_state, sub_state, exec_env)
 
-    {state, machine_state, sub_state, exec_env} = Operation.run_operation(operation, state, machine_state, sub_state, exec_env)
+    cost = Gas.cost(operation, state, machine_state, updated_machine_state)
 
-    machine_state = machine_state
+    updated_machine_state = updated_machine_state
       |> MachineState.subtract_gas(cost)
       |> MachineState.next_pc(exec_env)
 
-    {state, machine_state, sub_state, exec_env}
+
+    {updated_state, updated_machine_state, sub_state, exec_env}
   end
 
 end
