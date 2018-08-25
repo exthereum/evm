@@ -1,3 +1,4 @@
+version: 2
 jobs:
   build:
     working_directory: ~/evm
@@ -29,7 +30,10 @@ jobs:
             - deps
             - ~/.mix
 
+
+      - run: mix format --check-formatted
       - run: mix test
+      - run: mix credo
 
       - restore_cache:
           keys:

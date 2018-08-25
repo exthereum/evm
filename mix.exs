@@ -43,7 +43,7 @@ defmodule EVM.Mixfile do
   defp deps do
     [
       {:ex_rlp, "~> 0.3.0"},
-      {:credo, "~> 0.9.1", only: [:dev, :test], runtime: false},
+      {:credo, "~> 0.10.0", only: [:dev, :test], runtime: false},
       {:poison, "~> 3.1.0", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.14", only: :dev, runtime: false},
       {:merkle_patricia_tree,

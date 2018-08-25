@@ -185,14 +185,14 @@ defmodule EVM.Operation.EnvironmentalInformation do
       %{machine_state: %EVM.MachineState{active_words: 1, gas: nil, memory: <<54>> <> <<0::248>>, program_counter: 0, previously_active_words: 0, stack: []}}
   """
   @spec codecopy(Operation.stack_args(), Operation.vm_map()) :: Operation.op_result()
-  def codecopy([mem_offset, code_offset, length], %{
+  def codecopy([mem_offset, code_offset, code_length], %{
         exec_env: exec_env,
         machine_state: machine_state
       }) do
-    if length == 0 do
+    if code_length == 0 do
       0
     else
-      data = EVM.Memory.read_zeroed_memory(exec_env.machine_code, code_offset, length)
+      data = EVM.Memory.read_zeroed_memory(exec_env.machine_code, code_offset, code_length)
       machine_state = EVM.Memory.write(machine_state, mem_offset, Helpers.right_pad_bytes(data))
 
       %{machine_state: machine_state}
@@ -258,11 +258,11 @@ defmodule EVM.Operation.EnvironmentalInformation do
       %EVM.MachineState{active_words: 1, gas: nil, memory: <<54>> <> <<0::248>>, program_counter: 0, previously_active_words: 0, stack: []}
   """
   @spec extcodecopy(Operation.stack_args(), Operation.vm_map()) :: Operation.op_result()
-  def extcodecopy([address, code_offset, mem_offset, length], %{
+  def extcodecopy([address, code_offset, mem_offset, mem_length], %{
         machine_state: machine_state,
         exec_env: exec_env
       }) do
-    if length == 0 || length + mem_offset > EVM.max_int() do
+    if mem_length == 0 || mem_length + mem_offset > EVM.max_int() do
       0
     else
       wrapped_address = Helpers.wrap_address(address)
@@ -270,7 +270,7 @@ defmodule EVM.Operation.EnvironmentalInformation do
       account_code =
         AccountInterface.get_account_code(exec_env.account_interface, wrapped_address)
 
-      data = EVM.Memory.read_zeroed_memory(account_code, code_offset, length)
+      data = EVM.Memory.read_zeroed_memory(account_code, code_offset, mem_length)
       machine_state = EVM.Memory.write(machine_state, mem_offset, Helpers.right_pad_bytes(data))
 
       %{machine_state: machine_state}

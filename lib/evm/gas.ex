@@ -33,17 +33,17 @@ defmodule EVM.Gas do
   # Paid for a JUMPDEST operation.
   @g_jumpdest 1
   # Paid for an SSTORE operation when the storage value is set to non-zero from zero.
-  @g_sset 20000
+  @g_sset 20_000
   # Paid for an SSTORE operation when the storage value’s zeroness remains unchanged or is set to zero.
   @g_sreset 5000
   # Refund given (added into refund counter) when the storage value is set to zero from non-zero.
-  @g_sclear 15000
+  @g_sclear 15_000
   # Refund given (added into refund counter) for suiciding an account.
-  @g_suicide 24000
+  @g_suicide 24_000
   # Amount of gas to pay for a SUICIDE operation.
   @g_suicide 5000
   # Paid for a CREATE operation.
-  @g_create 32000
+  @g_create 32_000
   # Paid per byte for a CREATE operation to succeed in placing code into state.
   @g_codedeposit 200
   # Paid for a CALL operation.
@@ -53,7 +53,7 @@ defmodule EVM.Gas do
   # A stipend for the called contract subtracted from Gcallvalue for a non-zero value transfer.
   @g_callstipend 2300
   # Paid for a CALL or SUICIDE operation which creates an account.
-  @g_newaccount 25000
+  @g_newaccount 25_000
   # Partial payment for an EXP operation.
   @g_exp 10
   # Partial payment when multiplied by dlog256(exponent)e for the EXP operation.
@@ -63,13 +63,13 @@ defmodule EVM.Gas do
   # The divsor of quadratic costs
   @g_quad_coeff_div 512
   # Paid by all contract-creating transactions after the Homestead transition.
-  @g_txcreate 32000
+  @g_txcreate 32_000
   # Paid for every zero byte of data or code for a transaction.
   @g_txdatazero 4
   # Paid for every non-zero byte of data or code for a transaction.
   @g_txdatanonzero 68
   # Paid for every transaction.
-  @g_transaction 21000
+  @g_transaction 21_000
   # Partial payment for a LOG operation.
   @g_log 375
   # Paid for each byte in a LOG operation’s data.
@@ -236,12 +236,12 @@ defmodule EVM.Gas do
         # f
         offset,
         # l
-        length
+        expansion_length
       ) do
-    if length == 0 do
+    if expansion_length == 0 do
       active_words
     else
-      max(active_words, round(:math.ceil((offset + length) / 32)))
+      max(active_words, round(:math.ceil((offset + expansion_length) / 32)))
     end
   end
 
